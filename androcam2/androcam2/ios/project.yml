@@ -1,0 +1,26 @@
+# XcodeGen spec: `brew install xcodegen && xcodegen` creates AndroCam.xcodeproj (no hand-maintained project file).
+name: AndroCam
+options:
+  bundleIdPrefix: app.androcam
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  AndroCam:
+    type: application
+    platform: iOS
+    sources: [AndroCam]
+    info:
+      path: AndroCam/Info.plist
+      properties:
+        CFBundleDisplayName: AndroCam
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSCameraUsageDescription: AndroCam streams your camera to your PC as a webcam.
+        NSMicrophoneUsageDescription: AndroCam streams your microphone to your PC.
+        NSLocalNetworkUsageDescription: AndroCam connects to AndroCam running on your PC over your local network.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.androcam.ios
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "2.0.0"
+        CURRENT_PROJECT_VERSION: "1"

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AndroCam</title>
+<style>
+  :root{
+    --bg:#0b0d12; --bg2:#12151c; --card:#171b24; --card2:#1d222d; --line:#262c3a;
+    --text:#eef1f7; --muted:#8c95a8; --accent:#5b8cff; --accent2:#8a5bff; --ok:#33d17a; --warn:#ffb020; --bad:#ff5d5d;
+    --r:16px;
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;font-family:"Segoe UI Variable","Segoe UI",system-ui,-apple-system,sans-serif;color:var(--text);
+    background:radial-gradient(1200px 600px at 10% -10%,#1a2140 0%,transparent 60%),radial-gradient(900px 500px at 110% 10%,#2a1a45 0%,transparent 55%),var(--bg);
+    overflow-x:hidden}
+  header{display:flex;align-items:center;gap:14px;padding:18px 28px;border-bottom:1px solid var(--line);backdrop-filter:blur(8px);position:sticky;top:0;z-index:5;background:rgba(11,13,18,.7)}
+  .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-weight:800}
+  h1{font-size:18px;margin:0;letter-spacing:.2px} .sp{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:13px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+  .pill.ok{color:var(--ok);border-color:#1f4a35}.pill.ok .dot{background:var(--ok);animation:pulse 1.8s infinite}
+  .pill.warn{color:var(--warn)}.pill.warn .dot{background:var(--warn)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(51,209,122,.6)}70%{box-shadow:0 0 0 9px rgba(51,209,122,0)}100%{box-shadow:0 0 0 0 rgba(51,209,122,0)}}
+  main{max-width:1080px;margin:0 auto;padding:26px 24px 60px;display:grid;grid-template-columns:1.25fr 1fr;gap:20px}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .card h2{margin:0 0 4px;font-size:15px;letter-spacing:.3px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.5}
+  .full{grid-column:1/-1}
+  .preview{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#05060a;border:1px solid var(--line)}
+  .preview img{width:100%;height:100%;object-fit:contain;display:block}
+  .preview .ph{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:14px;padding:20px;background:repeating-linear-gradient(45deg,#0a0c11,#0a0c11 14px,#0d1017 14px,#0d1017 28px)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card2);color:var(--text);padding:10px 16px;border-radius:11px;transition:.15s}
+  button:hover{border-color:#3a4358;transform:translateY(-1px)} button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;font-weight:600}
+  button.danger{color:var(--bad)} button.on{background:#2a2410;border-color:#6b5513;color:var(--warn)}
+  select{font:inherit;background:var(--card2);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:13px}.kv b{color:var(--muted);font-weight:500}
+  .meter{height:12px;border-radius:99px;background:#0a0c11;border:1px solid var(--line);overflow:hidden}
+  .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--warn) 75%,var(--bad));transition:width .12s}
+  .switch{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;user-select:none}
+  .switch input{display:none}.switch span{width:42px;height:24px;border-radius:99px;background:#2a3040;position:relative;transition:.2s}
+  .switch span:after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+  .switch input:checked+span{background:var(--accent)}.switch input:checked+span:after{left:21px}
+  .code{font-family:"Cascadia Mono",Consolas,monospace;font-size:44px;letter-spacing:10px;font-weight:700;background:linear-gradient(135deg,#fff,#aab8ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .badge{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--card2);border:1px solid var(--line);color:var(--muted)}
+  .badge.ok{color:var(--ok);border-color:#1f4a35}.badge.bad{color:var(--bad)}.badge.warn{color:var(--warn)}
+  /* wizard */
+  #wiz{position:fixed;inset:0;z-index:20;display:none;place-items:center;background:rgba(5,6,10,.82);backdrop-filter:blur(10px)}
+  #wiz.show{display:grid}
+  .wcard{width:min(720px,94vw);max-height:92vh;overflow:auto;background:linear-gradient(180deg,#1a1f2b,#12151c);border:1px solid var(--line);border-radius:22px;padding:34px 36px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  .steps{display:flex;gap:8px;margin-bottom:26px}.steps i{flex:1;height:5px;border-radius:9px;background:#2a3040}.steps i.done{background:var(--accent)}.steps i.cur{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .wcard h3{font-size:26px;margin:0 0 8px}.wcard p{color:var(--muted);line-height:1.6;margin:8px 0}
+  .big{font-size:22px;font-weight:700;color:var(--text);word-break:break-all;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:12px 0;display:inline-block}
+  .wnav{display:flex;gap:10px;margin-top:28px}.wnav .sp{flex:1}
+  .note{font-size:13px;border-left:3px solid var(--warn);background:#221c0c;padding:10px 14px;border-radius:0 10px 10px 0;color:#e7d6a8;margin-top:14px}
+  ol.how{padding-left:20px;color:var(--muted);line-height:1.8} ol.how b{color:var(--text)}
+  .check{display:flex;align-items:center;gap:10px;margin:10px 0;font-size:15px}
+  .tick{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#2a3040;font-size:13px}.tick.ok{background:var(--ok);color:#04210f}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">A</div><h1>AndroCam</h1><div class="sp"></div>
+  <span id="pill" class="pill"><i class="dot"></i><span id="pilltxt">Starting…</span></span>
+  <button id="btnGuide">Setup guide</button>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Live view</h2>
+    <p class="sub">What your phone sees. This preview is optional: the virtual webcam works even if you close this window.</p>
+    <div class="preview"><img id="preview" alt=""><div class="ph" id="ph">Waiting for your phone…<br>Open the AndroCam app on it.</div></div>
+    <div class="row">
+      <button id="btnFlip">Switch camera</button>
+      <button id="btnTorch">Flash: off</button>
+      <select id="selQuality" title="Picture quality">
+        <option value="1280,720,80,30">720p · balanced</option>
+        <option value="1920,1080,85,30">1080p · sharp</option>
+        <option value="854,480,70,30">480p · light (slow Wi-Fi)</option>
+      </select>
+      <select id="selCanvas" title="Webcam output size">
+        <option value="1280,720">Webcam size 720p</option><option value="1920,1080">Webcam size 1080p</option>
+        <option value="854,480">Webcam size 480p</option><option value="640,360">Webcam size 360p</option>
+      </select>
+    </div>
+    <div class="row"><label class="switch"><input type="checkbox" id="swMirror"><span></span>Mirror picture</label>
+      <span class="badge" id="fps">0 fps</span></div>
+  </section>
+
+  <section style="display:grid;gap:20px;align-content:start">
+    <div class="card">
+      <h2>Phone</h2>
+      <div class="kv" style="margin-top:10px">
+        <b>Status</b><span id="phStatus">–</span><b>Device</b><span id="phName">–</span>
+        <b>PC address</b><span id="phAddr">–</span><b>Pairing code</b><span id="phCode" style="font-family:Consolas,monospace;font-weight:700;letter-spacing:3px">–</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Virtual webcam</h2>
+      <p class="sub">Pick <b>AndroCam Virtual Camera</b> in Zoom, Teams, Discord, Chrome… No OBS needed.</p>
+      <div class="row" style="margin-top:0"><span class="badge" id="vcBadge">…</span>
+        <button id="btnVcam" class="primary">Install</button><button id="btnVcamRm" class="danger">Remove</button></div>
+    </div>
+    <div class="card">
+      <h2>Microphone</h2>
+      <p class="sub" id="micSub">Your phone's microphone reaches this PC. A driver is needed to expose it as a system microphone.</p>
+      <div class="meter"><i id="meter"></i></div>
+      <div class="row"><label class="switch"><input type="checkbox" id="swMuteMic"><span></span>Mute</label>
+        <label class="switch"><input type="checkbox" id="swPhoneMic" checked><span></span>Phone mic on</label>
+        <span class="badge warn" id="drvBadge">driver not installed</span></div>
+    </div>
+  </section>
+
+  <section class="card full">
+    <h2>Settings</h2>
+    <div class="row" style="margin-top:8px">
+      <label class="switch"><input type="checkbox" id="swAuto"><span></span>Start with Windows (runs quietly in the background)</label>
+      <div class="sp"></div>
+      <button id="btnCode">New pairing code</button><button id="btnQuit" class="danger">Quit AndroCam</button>
+    </div>
+  </section>
+</main>
+
+<div id="wiz"><div class="wcard"><div class="steps" id="steps"></div><div id="wbody"></div>
+  <div class="wnav"><button id="wBack">Back</button><div class="sp"></div><button id="wSkip">Skip</button><button id="wNext" class="primary">Next</button></div></div></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let S = null, wizOpen = false, step = 0, lastSeqSrc = false;
+const STEPS = 7;
+
+async function api(path, body) {
+  try {
+    const r = await fetch(path, {method: body ? "POST" : "GET", headers: body ? {"X-AndroCam": "1", "Content-Type": "application/json"} : {},
+                                 body: body ? JSON.stringify(body) : undefined});
+    return await r.json();
+  } catch (e) { return {ok: false, error: String(e)}; }
+}
+const ctl = (o) => api("/api/control", o);
+const el = (tag, attrs, ...kids) => { const e = document.createElement(tag); for (const k in (attrs||{})) { if (k === "class") e.className = attrs[k]; else e.setAttribute(k, attrs[k]); }
+  for (const c of kids) e.append(c && c.nodeType ? c : document.createTextNode(c ?? "")); return e; };
+
+function mainAddr() { return (S && S.ips && S.ips[0]) || "your-pc-ip"; }
+function dlUrl() { return `http://${mainAddr()}:${S ? S.download_port : 47802}`; }
+
+/* ---------------- dashboard ---------------- */
+function renderDash() {
+  const c = S.phone.connected, st = S.phone.status || {}, info = S.phone.info || {};
+  $("pill").className = "pill " + (c ? "ok" : "warn");
+  $("pilltxt").textContent = c ? "Phone connected" : "Waiting for phone";
+  $("phStatus").textContent = c ? "Connected" : "Not connected";
+  $("phName").textContent = c ? `${info.name || "Phone"} (${info.os || "?"})` : "–";
+  $("phAddr").textContent = `${mainAddr()} : ${S.phone_port}`;
+  $("phCode").textContent = S.pair_code;
+  $("fps").textContent = `${S.video.fps} fps`;
+  $("btnTorch").textContent = "Flash: " + (st.torch ? "on" : "off");
+  $("btnTorch").className = st.torch ? "on" : "";
+  ["btnFlip", "btnTorch", "selQuality"].forEach(i => $(i).disabled = !c);
+  const img = $("preview");
+  if (c && !lastSeqSrc) { img.src = "/preview.mjpg?" + Date.now(); lastSeqSrc = true; }
+  if (!c && lastSeqSrc) { img.removeAttribute("src"); lastSeqSrc = false; }
+  $("ph").style.display = c && S.video.fps > 0 ? "none" : "grid";
+  if (document.activeElement !== $("selCanvas")) $("selCanvas").value = S.video.canvas.join(",");
+  if (document.activeElement !== $("swMirror")) $("swMirror").checked = S.video.mirror;
+  $("swMuteMic").checked = S.audio.muted;
+  $("meter").style.width = Math.round(S.audio.level * 100) + "%";
+  const vb = $("vcBadge");
+  if (!S.vcam.supported) { vb.textContent = "Windows only"; vb.className = "badge bad"; }
+  else if (S.vcam.installed) { vb.textContent = "Installed"; vb.className = "badge ok"; }
+  else { vb.textContent = S.vcam.files ? "Not installed" : "Files missing"; vb.className = "badge warn"; }
+  $("btnVcam").disabled = !S.vcam.supported || !S.vcam.files; $("btnVcamRm").disabled = !S.vcam.installed;
+  $("btnVcam").textContent = S.vcam.installed ? "Reinstall" : "Install";
+  $("drvBadge").textContent = S.mic_driver.installed ? "driver installed" : "driver not installed";
+  $("drvBadge").className = "badge " + (S.mic_driver.installed ? "ok" : "warn");
+  if (document.activeElement !== $("swAuto")) $("swAuto").checked = S.autostart;
+}
+
+/* ---------------- wizard ---------------- */
+function tick(ok, text) { return el("div", {class: "check"}, el("span", {class: "tick" + (ok ? " ok" : "")}, ok ? "✓" : "•"), text); }
+const PAGES = [
+  () => [el("h3", {}, "Welcome to AndroCam"),
+    el("p", {}, "Turn your phone into a high-quality webcam and microphone for this PC. No cables required, and no other software to install."),
+    el("p", {}, "This quick guide takes about two minutes. You can reopen it any time from “Setup guide”.")],
+  () => [el("h3", {}, "Install the app on your phone"),
+    el("p", {}, "Android: connect your phone to the same Wi-Fi, open this address in its browser, and install the app:"),
+    el("div", {class: "big"}, dlUrl()),
+    S.apk ? el("p", {}, "When Android asks, allow “Install unknown apps” for your browser (one time).") :
+            el("div", {class: "note"}, "The Android app isn't bundled in this build, so the download page is empty. Build it from the android/ folder (see the README)."),
+    el("div", {class: "note"}, "iPhone: the iOS app must be built from the ios/ folder on a Mac and installed with your Apple ID (Apple's rule, not ours). See the README."),
+    el("p", {}, "Using USB instead of Wi-Fi? Plug the phone in and turn on “USB tethering”; the phone app then connects over the cable.")],
+  () => [el("h3", {}, "Connect your phone"),
+    el("p", {}, "Open AndroCam on your phone. It finds this PC automatically; enter this code when it asks:"),
+    el("div", {class: "code"}, S.pair_code),
+    el("p", {}, `If it can't find the PC, type this address instead: ${mainAddr()}`),
+    el("div", {class: "note"}, "Still can't connect? Make sure the phone and PC are on the same Wi-Fi, and that Windows lists that network as “Private” (Settings › Network & internet › Wi-Fi › your network). If a firewall prompt appears for AndroCam, choose Allow."),
+    tick(S.phone.connected, S.phone.connected ? `Connected: ${S.phone.info.name || "phone"}` : "Waiting for your phone…")],
+  () => [el("h3", {}, "Check your camera"),
+    el("p", {}, "You should see yourself below. Try switching cameras and the flash."),
+    (() => { const w = el("div", {class: "preview"}); const i = el("img", {src: S.phone.connected ? "/preview.mjpg?" + Date.now() : ""}); w.append(i);
+             if (!S.phone.connected) w.append(el("div", {class: "ph"}, "Connect your phone first")); return w; })(),
+    el("div", {class: "row"},
+      (() => { const b = el("button", {}, "Switch camera"); b.onclick = () => ctl({cmd: "camera", facing: ((S.phone.status||{}).facing === "front") ? "back" : "front"}); return b; })(),
+      (() => { const b = el("button", {}, "Toggle flash"); b.onclick = () => ctl({cmd: "torch", on: !((S.phone.status||{}).torch)}); return b; })())],
+  () => [el("h3", {}, "Make it a real webcam"),
+    el("p", {}, "AndroCam adds a virtual camera called “AndroCam Virtual Camera” that works in Zoom, Teams, Discord, Chrome and most video apps."),
+    tick(S.vcam.installed, S.vcam.installed ? "Virtual camera is installed" : "Virtual camera not installed yet"),
+    (() => { const b = el("button", {class: "primary"}, S.vcam.installed ? "Reinstall" : "Install virtual camera"); b.disabled = !S.vcam.supported || !S.vcam.files;
+             b.onclick = async () => { const r = await api("/api/vcam", {action: "install"}); b.textContent = r.message || r.error || "…"; }; return b; })(),
+    el("p", {}, "Windows will ask for permission once (it's registering a camera device). Afterwards, choose the camera in your video app's settings. Restart that app if it doesn't appear.")],
+  () => [el("h3", {}, "Microphone"),
+    el("p", {}, "Say something. The bar shows your phone's microphone arriving at this PC:"),
+    (() => { const m = el("div", {class: "meter"}); m.append(el("i", {id: "wmeter"})); return m; })(),
+    tick(false, "System microphone driver: not installed"),
+    el("div", {class: "note"}, "Windows only allows an app to appear as a microphone through a signed driver. The AndroCam microphone driver is the last piece of this project and is not part of this build yet. Your camera works fully without it.")],
+  () => [el("h3", {}, "You're all set 🎉"),
+    el("p", {}, "AndroCam keeps running in the background after you close this window, so your camera stays available. Reopen it from the Start menu any time."),
+    tick(S.phone.connected, "Phone connected"), tick(S.vcam.installed, "Virtual webcam installed"),
+    el("p", {}, "Tip: turn on “Start with Windows” in Settings so it's always ready.")],
+];
+
+function renderWiz() {
+  const w = $("wiz"); w.classList.toggle("show", wizOpen);
+  if (!wizOpen || !S) return;
+  const steps = $("steps"); steps.replaceChildren(...Array.from({length: STEPS}, (_, i) => el("i", {class: i < step ? "done" : (i === step ? "cur" : "")})));
+  if (renderWiz.page !== step || renderWiz.sig !== sig()) {      // rebuild on page change or when live state changes
+    $("wbody").replaceChildren(...PAGES[step]()); renderWiz.page = step; renderWiz.sig = sig();
+  }
+  if (step === 5 && $("wmeter")) $("wmeter").style.width = Math.round(S.audio.level * 100) + "%";
+  $("wBack").style.visibility = step === 0 ? "hidden" : "visible";
+  $("wSkip").style.display = (step === 2 || step === 4) && !(step === 2 && S.phone.connected) ? "inline-block" : "none";
+  $("wNext").textContent = step === STEPS - 1 ? "Finish" : (step === 0 ? "Get started" : "Next");
+  $("wNext").disabled = step === 2 && !S.phone.connected;
+}
+const sig = () => JSON.stringify([S.phone.connected, S.vcam.installed, S.pair_code, S.apk, S.ips]);
+function goto(n) { step = Math.max(0, Math.min(STEPS - 1, n)); renderWiz.page = -1; ctl({cmd: "setup", step}); renderWiz(); }
+$("wNext").onclick = async () => { if (step === STEPS - 1) { wizOpen = false; await ctl({cmd: "setup", step: 0, done: true}); renderWiz(); } else goto(step + 1); };
+$("wBack").onclick = () => goto(step - 1);
+$("wSkip").onclick = () => goto(step + 1);
+$("btnGuide").onclick = () => { wizOpen = true; goto(0); };
+
+/* ---------------- controls ---------------- */
+$("btnFlip").onclick = () => ctl({cmd: "camera", facing: ((S.phone.status || {}).facing === "front") ? "back" : "front"});
+$("btnTorch").onclick = () => ctl({cmd: "torch", on: !((S.phone.status || {}).torch)});
+$("selQuality").onchange = e => { const [w, h, jpeg, fps] = e.target.value.split(",").map(Number); ctl({cmd: "quality", w, h, jpeg, fps}); };
+$("selCanvas").onchange = e => { const [w, h] = e.target.value.split(",").map(Number); ctl({cmd: "canvas", w, h}); };
+$("swMirror").onchange = e => ctl({cmd: "mirror", on: e.target.checked});
+$("swMuteMic").onchange = e => ctl({cmd: "mic_mute", on: e.target.checked});
+$("swPhoneMic").onchange = e => ctl({cmd: "phone_mic", on: e.target.checked});
+$("swAuto").onchange = e => ctl({cmd: "autostart", on: e.target.checked});
+$("btnCode").onclick = () => { if (confirm("Create a new pairing code? Your phone will have to enter it again.")) ctl({cmd: "regen_code"}); };
+$("btnVcam").onclick = async () => { const r = await api("/api/vcam", {action: "install"}); $("vcBadge").textContent = r.message || r.error; };
+$("btnVcamRm").onclick = async () => { if (confirm("Remove the virtual camera?")) { const r = await api("/api/vcam", {action: "uninstall"}); $("vcBadge").textContent = r.message || r.error; } };
+$("btnQuit").onclick = async () => { if (confirm("Quit AndroCam? The virtual camera will stop working until you start it again.")) { await api("/api/quit", {}); document.body.innerHTML = "<p style='padding:40px;font-family:system-ui;color:#ccc'>AndroCam has quit. You can close this window.</p>"; } };
+
+/* ---------------- loop ---------------- */
+let first = true;
+async function tickLoop() {
+  const s = await api("/api/state");
+  if (s && s.pair_code) {
+    S = s;
+    if (first) { first = false; step = S.wizard_step || 0; wizOpen = S.first_run; }
+    renderDash(); renderWiz();
+  } else { $("pilltxt").textContent = "AndroCam is not running"; $("pill").className = "pill"; }
+  setTimeout(tickLoop, 700);
+}
+tickLoop();
+</script>
+</body>
+</html>
