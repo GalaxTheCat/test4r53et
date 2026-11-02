@@ -3,6 +3,9 @@
 #     AndroCam-Windows-Setup  (installer: app + virtual camera + bundled Android app)
 #     AndroCam-Android        (AndroCam.apk)
 #     AndroCam-iOS-unsigned   (needs re-signing with your Apple ID; see docs/IOS.md)
+#
+# Every job first LOCATES the project folder (works whether the files are at the top of the repo or inside
+# a sub-folder) and prints a clear message if they are missing.
 name: build
 on:
   workflow_dispatch: {}
@@ -11,56 +14,95 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Locate project
+        shell: bash
+        run: |
+          f=$(find . -path '*/host/androcam_host/__init__.py' | head -n 1)
+          if [ -z "$f" ]; then
+            echo "::error::AndroCam project files not found in this repository (expected a 'host' folder containing 'androcam_host')."
+            echo "Top level of the repository:"; ls -la
+            exit 1
+          fi
+          root=$(dirname "$(dirname "$(dirname "$f")")")
+          echo "Project folder: $root"
+          echo "ROOT=$root" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -r host/requirements.txt
+        working-directory: ${{ env.ROOT }}
       - run: python host/tests/test_host.py
+        working-directory: ${{ env.ROOT }}
       - run: python host/tests/test_shm_c.py
+        working-directory: ${{ env.ROOT }}
       - run: python host/tests/test_mobile_wire.py
+        working-directory: ${{ env.ROOT }}
       - run: node host/tests/test_ui.js
+        working-directory: ${{ env.ROOT }}
 
   android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Locate project
+        shell: bash
+        run: |
+          f=$(find . -path '*/host/androcam_host/__init__.py' | head -n 1)
+          if [ -z "$f" ]; then echo "::error::AndroCam project files not found in this repository."; ls -la; exit 1; fi
+          echo "ROOT=$(dirname "$(dirname "$(dirname "$f")")")" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: "17" }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.9" }
       - run: gradle -p android assembleDebug --no-daemon
+        working-directory: ${{ env.ROOT }}
       - uses: actions/upload-artifact@v4
         with:
           name: AndroCam-Android
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.ROOT }}/android/app/build/outputs/apk/debug/app-debug.apk
 
   ios:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+      - name: Locate project
+        shell: bash
+        run: |
+          f=$(find . -path '*/host/androcam_host/__init__.py' | head -n 1)
+          if [ -z "$f" ]; then echo "::error::AndroCam project files not found in this repository."; ls -la; exit 1; fi
+          echo "ROOT=$(dirname "$(dirname "$(dirname "$f")")")" >> "$GITHUB_ENV"
       - run: brew install xcodegen
       - run: xcodegen generate --spec ios/project.yml --project ios
+        working-directory: ${{ env.ROOT }}
       - run: >
           xcodebuild -project ios/AndroCam.xcodeproj -scheme AndroCam -configuration Release
           -sdk iphoneos -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+        working-directory: ${{ env.ROOT }}
       - run: |
           mkdir -p ios/out/Payload
           cp -R ios/build/Build/Products/Release-iphoneos/AndroCam.app ios/out/Payload/
           (cd ios/out && zip -qr AndroCam-unsigned.ipa Payload)
+        working-directory: ${{ env.ROOT }}
       - uses: actions/upload-artifact@v4
         with:
           name: AndroCam-iOS-unsigned
-          path: ios/out/AndroCam-unsigned.ipa
+          path: ${{ env.ROOT }}/ios/out/AndroCam-unsigned.ipa
 
   windows:
     needs: [test, android]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Locate project
+        shell: bash
+        run: |
+          f=$(find . -path '*/host/androcam_host/__init__.py' | head -n 1)
+          if [ -z "$f" ]; then echo "::error::AndroCam project files not found in this repository."; ls -la; exit 1; fi
+          echo "ROOT=$(dirname "$(dirname "$(dirname "$f")")")" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
-        with: { name: AndroCam-Android, path: apk }
+        with: { name: AndroCam-Android, path: "${{ github.workspace }}/apk" }
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
 
@@ -72,8 +114,9 @@ jobs:
 
       - name: Build the virtual camera (x64 + x86)
         shell: pwsh
+        working-directory: ${{ env.ROOT }}
         run: |
-          $base = "$PWD/wcs/Samples/Win7Samples/multimedia/directshow/baseclasses"
+          $base = "$env:GITHUB_WORKSPACE/wcs/Samples/Win7Samples/multimedia/directshow/baseclasses"
           cmake -S vcam -B build-x64 -A x64   "-DBASECLASSES_DIR=$base" -DARCH_NAME=x64
           cmake --build build-x64 --config Release
           cmake -S vcam -B build-x86 -A Win32 "-DBASECLASSES_DIR=$base" -DARCH_NAME=x86
@@ -81,10 +124,11 @@ jobs:
           New-Item -ItemType Directory -Force host/resources | Out-Null
           Copy-Item build-x64/Release/androcam_vcam_x64.dll host/resources/
           Copy-Item build-x86/Release/androcam_vcam_x86.dll host/resources/
-          Copy-Item apk/app-debug.apk host/resources/AndroCam.apk
+          Copy-Item "$env:GITHUB_WORKSPACE/apk/app-debug.apk" host/resources/AndroCam.apk
 
       - name: Package the app
         shell: pwsh
+        working-directory: ${{ env.ROOT }}
         run: |
           pip install -r host/requirements.txt pyinstaller
           pyinstaller --noconfirm --clean --windowed --name AndroCam --icon windows/androcam.ico `
@@ -93,6 +137,7 @@ jobs:
 
       - name: Installer
         shell: pwsh
+        working-directory: ${{ env.ROOT }}
         run: |
           choco install innosetup -y --no-progress
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" windows/AndroCam.iss
@@ -100,4 +145,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: AndroCam-Windows-Setup
-          path: dist/AndroCam-Setup.exe
+          path: ${{ env.ROOT }}/dist/AndroCam-Setup.exe
