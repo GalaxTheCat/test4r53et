@@ -1,0 +1,103 @@
+# Builds everything in the cloud - nothing to install locally.
+#   Actions -> build -> Run workflow, then download the artifacts:
+#     AndroCam-Windows-Setup  (installer: app + virtual camera + bundled Android app)
+#     AndroCam-Android        (AndroCam.apk)
+#     AndroCam-iOS-unsigned   (needs re-signing with your Apple ID; see docs/IOS.md)
+name: build
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r host/requirements.txt
+      - run: python host/tests/test_host.py
+      - run: python host/tests/test_shm_c.py
+      - run: python host/tests/test_mobile_wire.py
+      - run: node host/tests/test_ui.js
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.9" }
+      - run: gradle -p android assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AndroCam-Android
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: xcodegen generate --spec ios/project.yml --project ios
+      - run: >
+          xcodebuild -project ios/AndroCam.xcodeproj -scheme AndroCam -configuration Release
+          -sdk iphoneos -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      - run: |
+          mkdir -p ios/out/Payload
+          cp -R ios/build/Build/Products/Release-iphoneos/AndroCam.app ios/out/Payload/
+          (cd ios/out && zip -qr AndroCam-unsigned.ipa Payload)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AndroCam-iOS-unsigned
+          path: ios/out/AndroCam-unsigned.ipa
+
+  windows:
+    needs: [test, android]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: AndroCam-Android, path: apk }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Get Microsoft's DirectShow base classes (MIT licensed sample code)
+        shell: pwsh
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/microsoft/Windows-classic-samples.git wcs
+          git -C wcs sparse-checkout set Samples/Win7Samples/multimedia/directshow/baseclasses
+
+      - name: Build the virtual camera (x64 + x86)
+        shell: pwsh
+        run: |
+          $base = "$PWD/wcs/Samples/Win7Samples/multimedia/directshow/baseclasses"
+          cmake -S vcam -B build-x64 -A x64   "-DBASECLASSES_DIR=$base" -DARCH_NAME=x64
+          cmake --build build-x64 --config Release
+          cmake -S vcam -B build-x86 -A Win32 "-DBASECLASSES_DIR=$base" -DARCH_NAME=x86
+          cmake --build build-x86 --config Release
+          New-Item -ItemType Directory -Force host/resources | Out-Null
+          Copy-Item build-x64/Release/androcam_vcam_x64.dll host/resources/
+          Copy-Item build-x86/Release/androcam_vcam_x86.dll host/resources/
+          Copy-Item apk/app-debug.apk host/resources/AndroCam.apk
+
+      - name: Package the app
+        shell: pwsh
+        run: |
+          pip install -r host/requirements.txt pyinstaller
+          pyinstaller --noconfirm --clean --windowed --name AndroCam --icon windows/androcam.ico `
+            --paths host --add-data "host/androcam_host/web;androcam_host/web" --add-data "host/resources;resources" `
+            host/run_androcam.py
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" windows/AndroCam.iss
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AndroCam-Windows-Setup
+          path: dist/AndroCam-Setup.exe
